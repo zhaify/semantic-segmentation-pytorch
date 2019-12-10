@@ -17,6 +17,7 @@ from lib.utils import as_numpy
 from PIL import Image
 from tqdm import tqdm
 from config import cfg
+import datetime
 
 colors = loadmat('data/color150.mat')['colors']
 names = {}
@@ -68,6 +69,7 @@ def test(segmentation_module, loader, gpu):
             scores = async_copy_to(scores, gpu)
 
             for img in img_resized_list:
+                
                 feed_dict = batch_data.copy()
                 feed_dict['img_data'] = img
                 del feed_dict['img_ori']
@@ -75,18 +77,14 @@ def test(segmentation_module, loader, gpu):
                 feed_dict = async_copy_to(feed_dict, gpu)
 
                 # forward pass
-                pred_tmp = segmentation_module(feed_dict, segSize=segSize)
-                scores = scores + pred_tmp / len(cfg.DATASET.imgSizes)
+                feed_dict = async_copy_to(img, gpu)
+                s = datetime.datetime.now()
+                pred = segmentation_module(feed_dict)
+                e = datetime.datetime.now()
+                cost = e - s
+                print('latency {} ms, FPS {}'.format(cost.microseconds/1000.0, 1.0*1000*1000 / cost.microseconds))
 
-            _, pred = torch.max(scores, dim=1)
-            pred = as_numpy(pred.squeeze(0).cpu())
-
-        # visualization
-        visualize_result(
-            (batch_data['img_ori'], batch_data['info']),
-            pred,
-            cfg
-        )
+                break
 
         pbar.update(1)
 
